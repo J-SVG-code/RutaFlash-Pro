@@ -1,7 +1,40 @@
-# ⚡ Ruta Flash v3.0 - Diseño Limpio, GPS Automático y Modo Día/Noche
+# Ruta Flash
 
-## Correcciones y Mejoras en v3.0
-1. **Botones y navegación 100% funcionales:** Se corrigió un error de comillas en `app.js` que impedía que JavaScript ejecutara los botones al tocarlos.
-2. **GPS Automático al entrar:** Al abrir la aplicación, detecta automáticamente tu ubicación GPS para fijar el punto de salida y retorno sin pasos extra.
-3. **Botón Modo Día / Noche (`🌙` / `☀️`):** Permite alternar entre interfaz clara (día) y oscura (noche) para mayor comodidad visual.
-4. **Diseño espaciado y moderno:** Barra de navegación inferior fija tipo app nativa, tarjetas limpias sin amontonamiento y nuevo ícono moderno.
+Aplicación web progresiva (PWA) ligera para repartidores y gestión de entregas multiparada, diseñada con enfoque local (`localStorage`), mapas con **Leaflet / OpenStreetMap**, enlaces directos a **Google Maps**, **Waze** y **WhatsApp**, control de caja y combustible, y gestión segura de cuenta con **Firebase Authentication** y **Cloud Firestore**.
+
+## Características principales
+
+- **Gestión de rutas y paradas:** Crea pedidos, define prioridad (`Normal` / `Urgente`), hora límite, extrae datos rápidos desde texto pegado de WhatsApp y optimiza el orden de entregas.
+- **GPS y mapas sin depender de APIs de mapas de pago:** Usa geolocalización del dispositivo y **Leaflet + OpenStreetMap**, además de accesos directos para navegar en Google Maps o Waze y chatear por WhatsApp.
+- **Cuadre de caja y combustible:** Calcula distancia estimada (incluyendo retorno al punto base), consumo estimado de gasolina según vehículo/rendimiento/precio, efectivo en mano, montos digitales, montos a comercios y ganancia neta.
+- **Comprobantes de entrega:** Permite adjuntar foto comprimida y nota al confirmar una entrega, con visor a pantalla completa.
+- **Modo Día / Noche:** Cambio de tema claro y oscuro desde el encabezado.
+- **Modelo Freemium y Cuenta Segura:**
+  - Plan gratuito con límite de hasta **20 paradas pendientes** y banner promocional/anuncios.
+  - Plan **PRO ($3.75 / mes)** orientado a paradas ilimitadas, funciones sin conexión/rastreo y experiencia sin anuncios.
+  - Autenticación con correo y contraseña mediante **Firebase Auth** y perfil ligero (`email`, `isPro`, `updatedAt`) guardado por `uid` en **Cloud Firestore** (`cuentas_ruta_flash/{userId}`).
+
+## Estructura del proyecto
+
+- `index.html`: Estructura de la interfaz (pestañas *Ruta*, *Nuevo*, *Mapa*, *Caja* y *Ajustes*), modales y configuración de servicios (`FIREBASE_CONFIG`, `ADMOB_CONFIG`, `BILLING_CONFIG`).
+- `app.js`: Lógica de estado local, cálculo de rutas/combustible/caja, integración con Leaflet/Nominatim, compresión de fotos y autenticación/sincronización con Firebase.
+- `styles.css`: Estilos responsivos y variables de tema claro/oscuro.
+- `manifest.json`: Metadatos de PWA e íconos.
+- `sw.js`: Service Worker para caché de recursos estáticos y teselas de mapa.
+
+## Configuración de Firebase
+
+1. Crea un proyecto en **Firebase Console** y registra la aplicación web.
+2. Habilita **Authentication -> Correo electrónico/contraseña**.
+3. Crea la base de datos **Cloud Firestore** y publica las reglas de seguridad correspondientes a `cuentas_ruta_flash/{userId}` para que cada usuario lea/escriba solo su documento y no pueda modificar `isPro` directamente desde el cliente.
+4. Verifica que `FIREBASE_CONFIG` en `index.html` contenga las credenciales de tu proyecto.
+
+## Publicación web y empaquetado para Google Play
+
+- **Web / PWA:** Puedes alojar los archivos en un hosting estático con HTTPS (por ejemplo, GitHub Pages o Netlify).
+- **Google Play:** Para publicar en Google Play se requiere generar un **Android App Bundle (`.aab`)** firmado (por ejemplo, mediante un contenedor/TWA como PWABuilder o Bubblewrap), configurar los IDs de anuncios y facturación/suscripciones correspondientes, y completar la política de privacidad y declaración de seguridad de datos.
+
+## Estado y notas
+
+- Los datos de pedidos, entregas y cuadre se almacenan localmente en el dispositivo (`ruta_flash_state_v3`); no se respaldan fotos ni rutas completas en Firestore.
+- Reemplaza los valores marcador (`PEGAR_AQUI_...` y datos de contacto/política) antes de distribuir en producción.
