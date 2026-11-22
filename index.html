@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Ruta Flash - Delivery Pro</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="bolt-icon">⚡</span>
+      <div>
+        <h1>Ruta Flash</h1>
+        <small id="plan-badge" class="badge-free">Plan Gratis (0/20 paradas)</small>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="net-status" class="net-pill online" title="Estado de conexión">🟢 Online</span>
+      <button id="btn-set-base" class="btn-icon" title="Fijar Punto de Salida/Retorno">🏠</button>
+      <button id="btn-pro-modal" class="btn-pro">👑 PRO $3.75</button>
+    </div>
+  </header>
+
+  <!-- Banner discreto para usuarios Free (se oculta en PRO) -->
+  <div id="ad-banner" class="ad-banner">
+    <span>📢 Anuncio · Desbloquea <b>Modo Sin Conexión PRO</b> y paradas ilimitadas</span>
+    <button onclick="openProModal()">Mejorar</button>
+  </div>
+
+  <!-- Aviso de bloqueo si se queda sin internet en Plan Gratis -->
+  <div id="offline-lock-banner" class="offline-lock hidden">
+    <div>
+      <strong>📵 Sin conexión a Internet</strong>
+      <p>El seguimiento de ruta en vivo sin datos, brújula GPS y caché offline son exclusivos de <b>Ruta Flash PRO</b>.</p>
+    </div>
+    <button onclick="openProModal()" class="btn-pro">👑 Activar PRO</button>
+  </div>
+
+  <!-- Panel En Vivo de Siguiente Parada (Exclusivo PRO / Funciona 100% sin internet con GPS) -->
+  <section id="pro-live-tracker" class="live-tracker hidden">
+    <div class="tracker-top">
+      <span class="tracker-badge">🛰️ GPS EN VIVO (MODO OFFLINE PRO)</span>
+      <span id="tracker-remaining-count">0 paradas restantes</span>
+    </div>
+    <div class="tracker-main">
+      <div class="tracker-dest">
+        <small>Siguiente parada:</small>
+        <strong id="tracker-next-client">--</strong>
+        <span id="tracker-next-addr">--</span>
+      </div>
+      <div class="tracker-dist-box">
+        <strong id="tracker-next-dist">-- km</strong>
+        <small id="tracker-next-eta">-- min</small>
+      </div>
+    </div>
+    <div class="tracker-footer">
+      <span>🏁 Total faltante (+retorno): <b id="tracker-total-left">0.0 km</b></span>
+      <button id="btn-prefetch-offline" class="btn-mini-pro">📥 Guardar Ruta Offline</button>
+    </div>
+  </section>
+
+  <!-- Resumen rápido de Ruta, Km y Gasolina -->
+  <section class="metrics-bar">
+    <div class="metric-card">
+      <span class="metric-label">Distancia (+Retorno)</span>
+      <strong id="metric-km">0.0 km</strong>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Gasolina Est.</span>
+      <strong id="metric-fuel">0.00 L ($0.00)</strong>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Mi Ganancia</span>
+      <strong id="metric-profit" class="text-green">$0.00</strong>
+    </div>
+  </section>
+
+  <!-- Navegación por Pestañas -->
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="tab-ruta">🛵 Ruta (<span id="count-pending">0</span>)</button>
+    <button class="tab-btn" data-tab="tab-nuevo">➕ Nuevo Pedido</button>
+    <button class="tab-btn" data-tab="tab-mapa">🗺️ Mapa</button>
+    <button class="tab-btn" data-tab="tab-caja">💰 Caja</button>
+    <button class="tab-btn" data-tab="tab-ajustes">⚙️ Ajustes</button>
+  </nav>
+
+  <main class="container">
+    <!-- TAB 1: LISTA DE RUTA OPTIMIZADA -->
+    <section id="tab-ruta" class="tab-content active">
+      <div class="route-controls">
+        <button id="btn-optimize" class="btn-primary">⚡ Optimizar Ruta Ahora</button>
+        <button id="btn-clear-completed" class="btn-secondary">🧹 Limpiar Entregados</button>
+      </div>
+      <div id="base-info" class="base-banner">
+        📍 Punto de salida y retorno: <span id="base-coords-text">No fijado (usa GPS o toca 🏠)</span>
+      </div>
+      <div id="stops-list" class="stops-list"></div>
+    </section>
+
+    <!-- TAB 2: AGREGAR PEDIDO -->
+    <section id="tab-nuevo" class="tab-content">
+      <div class="card">
+        <h2>➕ Cargar Nuevo Pedido</h2>
+        
+        <div class="quick-paste-box">
+          <label>📋 Pegar mensaje de WhatsApp o Link de Maps (Auto-detecta):</label>
+          <textarea id="wa-paste" rows="2" placeholder="Pega aquí el mensaje del cliente con dirección, teléfono o enlace de Google Maps..."></textarea>
+          <button type="button" id="btn-parse-wa" class="btn-secondary full-width">✨ Extraer Datos y Coordenadas</button>
+        </div>
+
+        <form id="order-form">
+          <div class="form-group">
+            <label>Cliente / Comercio *</label>
+            <input type="text" id="inp-client" required placeholder="Ej: Carlos Pérez (Burger King)" />
+          </div>
+
+          <div class="form-group">
+            <label>Teléfono WhatsApp</label>
+            <input type="tel" id="inp-phone" placeholder="Ej: 584121234567" />
+          </div>
+
+          <div class="form-group">
+            <label>Dirección o Referencia *</label>
+            <div class="input-row">
+              <input type="text" id="inp-address" required placeholder="Ej: Av. Soublette, frente a..." />
+              <button type="button" id="btn-search-addr" class="btn-small" title="Buscar en OpenStreetMap">🔍</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Latitud</label>
+              <input type="number" step="any" id="inp-lat" placeholder="10.6012" />
+            </div>
+            <div class="form-group">
+              <label>Longitud</label>
+              <input type="number" step="any" id="inp-lng" placeholder="-66.9321" />
+            </div>
+            <button type="button" id="btn-use-my-gps" class="btn-small align-end" title="Usar mi GPS actual">📍 Mi GPS</button>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prioridad de Entrega</label>
+              <select id="inp-priority">
+                <option value="normal">🟢 Normal (Por cercanía)</option>
+                <option value="high">🔥 URGENTE / Comida Caliente</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Hora Límite (Opcional)</label>
+              <input type="time" id="inp-deadline" />
+            </div>
+          </div>
+
+          <hr class="divider" />
+          <h3>💵 Datos de Cobro y Ganancia</h3>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Valor Producto ($ Comercio)</label>
+              <input type="number" step="0.01" id="inp-product-amount" value="0" />
+            </div>
+            <div class="form-group">
+              <label>Tarifa Delivery ($ Tuya)</label>
+              <input type="number" step="0.01" id="inp-delivery-fee" value="2.00" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Método de Pago</label>
+              <select id="inp-payment-method">
+                <option value="efectivo">💵 Efectivo (Cobrar al cliente)</option>
+                <option value="cuenta">📱 Transferencia / Pago Móvil</option>
+                <option value="pagado">✅ Ya pagado al comercio</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Cliente paga con ($ para vuelto)</label>
+              <input type="number" step="0.01" id="inp-cash-given" placeholder="Ej: 20.00" />
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary full-width">💾 Guardar y Agregar a Ruta</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 3: MAPA INTERACTIVO -->
+    <section id="tab-mapa" class="tab-content">
+      <div class="card map-wrapper">
+        <div class="map-header">
+          <span>🗺️ Vista de Ruta (Toca el mapa para fijar punto)</span>
+          <button id="btn-center-map" class="btn-small">🎯 Centrar</button>
+        </div>
+        <div id="map"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: CUADRE DE CAJA Y FINANZAS -->
+    <section id="tab-caja" class="tab-content">
+      <div class="card">
+        <h2>💰 Cuadre de Caja del Día</h2>
+        <div class="finance-grid">
+          <div class="fin-box">
+            <span>💵 Total en Efectivo</span>
+            <strong id="fin-cash">$0.00</strong>
+          </div>
+          <div class="fin-box">
+            <span>📱 Total en Cuenta / Digital</span>
+            <strong id="fin-bank">$0.00</strong>
+          </div>
+          <div class="fin-box highlight-amber">
+            <span>🏪 Debo rendir a Comercios</span>
+            <strong id="fin-merchant">$0.00</strong>
+          </div>
+          <div class="fin-box highlight-green">
+            <span>🛵 Mi Ganancia Bruta</span>
+            <strong id="fin-driver-gross">$0.00</strong>
+          </div>
+          <div class="fin-box highlight-red">
+            <span>⛽ Gasto Gasolina Est.</span>
+            <strong id="fin-fuel-cost">-$0.00</strong>
+          </div>
+          <div class="fin-box highlight-blue">
+            <span>🏆 Ganancia Neta Real</span>
+            <strong id="fin-net-profit">$0.00</strong>
+          </div>
+        </div>
+        <button id="btn-share-summary" class="btn-primary full-width" style="margin-top: 14px;">📲 Enviar Cuadre por WhatsApp</button>
+      </div>
+
+      <div class="card">
+        <h3>📸 Historial de Entregas Completadas</h3>
+        <div id="completed-list" class="completed-list"></div>
+      </div>
+    </section>
+
+    <!-- TAB 5: AJUSTES DE VEHÍCULO Y CUENTA -->
+    <section id="tab-ajustes" class="tab-content">
+      <div class="card">
+        <h2>⚙️ Configuración de Vehículo y Combustible</h2>
+        <div class="form-group">
+          <label>Tipo de Vehículo</label>
+          <select id="cfg-vehicle">
+            <option value="moto">🏍️ Moto (Prom. 35 km/L)</option>
+            <option value="carro">🚗 Carro (Prom. 12 km/L)</option>
+            <option value="bici">🚲 Bicicleta / Eléctrica (0 L)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Rendimiento (Km por Litro)</label>
+            <input type="number" step="0.1" id="cfg-kml" value="35" />
+          </div>
+          <div class="form-group">
+            <label>Precio Gasolina ($ / Litro)</label>
+            <input type="number" step="0.01" id="cfg-fuel-price" value="0.50" />
+          </div>
+        </div>
+        <button id="btn-save-settings" class="btn-primary full-width">💾 Guardar Ajustes</button>
+      </div>
+
+      <div class="card">
+        <h2>🔐 Respaldo de Cuenta y Suscripción</h2>
+        <p class="muted">Vincula tu correo Gmail para restaurar tu suscripción PRO ($3.75/mes) si cambias o formateas tu teléfono.</p>
+        <div class="form-group">
+          <label>Correo Google vinculado</label>
+          <input type="email" id="cfg-email" placeholder="tunombre@gmail.com" />
+        </div>
+        <button id="btn-save-account" class="btn-secondary full-width">✅ Vincular Cuenta / Restaurar Compra</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL DE ENTREGA CON FOTO -->
+  <div id="delivery-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>📸 Confirmar Entrega</h3>
+      <p id="modal-client-name" class="muted"></p>
+      <div class="form-group">
+        <label>Foto de Prueba de Entrega (Opcional)</label>
+        <input type="file" id="inp-proof-photo" accept="image/*" capture="environment" />
+        <img id="photo-preview" class="photo-preview hidden" alt="Vista previa" />
+      </div>
+      <div class="form-group">
+        <label>Nota de entrega</label>
+        <input type="text" id="inp-delivery-note" placeholder="Ej: Recibió vigilancia / Pagó completo" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="btn-cancel-delivery" class="btn-secondary">Cancelar</button>
+        <button type="button" id="btn-confirm-delivery" class="btn-primary">✅ Marcar Entregado</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SUSCRIPCIÓN PRO $3.75 -->
+  <div id="pro-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>👑 Ruta Flash PRO</h2>
+      <p class="price-tag">$3.75 <span>/ mes</span></p>
+      <ul class="pro-benefits">
+        <li>✅ <b>Modo Offline Completo:</b> Sigue tu ruta sin internet con rastreo GPS en vivo, distancia restante y caché de mapas</li>
+        <li>✅ <b>Paradas ilimitadas</b> por ruta (Gratis: hasta 20 con internet)</li>
+        <li>✅ <b>Cero anuncios</b> en toda la aplicación</li>
+        <li>✅ Optimización prioritaria para comida caliente</li>
+        <li>✅ Respaldo automático con tu cuenta Google</li>
+      </ul>
+      <div class="modal-actions">
+        <button type="button" id="btn-close-pro" class="btn-secondary">Seguir Gratis</button>
+        <button type="button" id="btn-activate-pro" class="btn-pro">⚡ Activar PRO ($3.75)</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
