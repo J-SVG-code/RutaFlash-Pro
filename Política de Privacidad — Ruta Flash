@@ -1,0 +1,59 @@
+# Política de Privacidad de Ruta Flash
+
+**Última actualización:** 22 de noviembre de 2026
+
+**Ruta Flash** ("la Aplicación") es una herramienta de apoyo para repartidores y gestión de entregas multiparada, cálculo estimado de distancias/combustible, cuadre de caja y comprobantes de entrega. Esta Política de Privacidad explica cómo se trata la información cuando utilizas la Aplicación.
+
+## 1. Información que se procesa y dónde se guarda
+
+### A. Datos almacenados localmente en tu dispositivo (`localStorage` y caché del navegador/PWA)
+La Aplicación prioriza el funcionamiento rápido y local en el equipo del usuario. En el almacenamiento local de tu dispositivo se guardan datos operativos como:
+- Punto de salida y retorno configurado o detectado mediante GPS.
+- Pedidos creados (nombre de cliente o local, teléfono opcional, dirección o coordenadas, prioridad, hora límite, montos de comercio/envío, forma de pago, vuelto y estado de entrega).
+- Notas y fotografías comprimidas de comprobante de entrega capturadas o seleccionadas por el usuario.
+- Preferencias de interfaz y configuración (tema día/noche, vehículo, rendimiento km/l, precio de combustible y estado local de sesión/plan).
+- Recursos de la aplicación y mapas en caché mediante Service Worker cuando corresponda.
+
+**Estos datos operativos (pedidos, rutas, cuadres y fotos de entrega) se mantienen en tu dispositivo y no se envían de forma masiva a servidores propios de Ruta Flash.** Si borras los datos de la aplicación/navegador o desinstalas la app sin respaldo previo, los datos locales pueden perderse.
+
+### B. Datos de cuenta y autenticación (Firebase Authentication y Cloud Firestore)
+Si decides crear una cuenta o iniciar sesión con correo electrónico y contraseña:
+- **Firebase Authentication** gestiona el acceso de tu cuenta mediante tu correo y credenciales de autenticación.
+- **Cloud Firestore** almacena en la colección `cuentas_ruta_flash` un registro asociado a tu identificador de usuario (`userId` / `uid`) que contiene exclusivamente:
+  - Correo electrónico (`email`)
+  - Estado de suscripción (`isPro`, booleano)
+  - Fecha/hora de actualización (`updatedAt`)
+
+No se suben a esa base de datos fotografías de entregas ni el historial completo de tus pedidos o cuadres de caja.
+
+## 2. Permisos del dispositivo
+
+- **Ubicación (GPS):** Se utiliza para ubicar tu punto de salida/retorno, calcular distancias estimadas, ordenar paradas, mostrar tu posición en el mapa (OpenStreetMap/Leaflet) y, en funciones habilitadas, asistir en la ruta. Puedes activar, restringir o revocar el permiso de ubicación en los ajustes del sistema de tu dispositivo.
+- **Cámara / Archivos:** Solo se accede cuando eliges adjuntar o tomar una foto como comprobante de entrega.
+- **Acceso a red:** Se utiliza para cargar mapas, consultar direcciones, sincronizar el estado de cuenta, mostrar anuncios en la versión gratuita (cuando aplique) o gestionar suscripciones.
+
+## 3. Publicidad y suscripciones (Plan PRO)
+
+- **Versión gratuita:** Puede mostrar anuncios publicitarios (por ejemplo, a través de Google AdMob) conforme a la configuración de la versión publicada. Los proveedores publicitarios pueden tratar ciertos identificadores o datos técnicos según sus propias políticas de privacidad.
+- **Ruta Flash PRO ($3.75 / mes):** Las funciones ampliadas y el estado `PRO` se asocian a tu cuenta y a la verificación de compra correspondiente (por ejemplo, mediante Google Play Billing cuando esté habilitado).
+
+## 4. Enlaces externos
+
+La Aplicación puede abrir aplicaciones o enlaces externos como **Google Maps**, **Waze** o **WhatsApp** cuando tú eliges navegar hacia una dirección o contactar a un número. El tratamiento de datos dentro de esas aplicaciones externas se rige por sus respectivas políticas de privacidad.
+
+## 5. Seguridad y retención de datos
+
+Aplicamos controles en las reglas de acceso de Firestore para que cada usuario autenticado acceda únicamente a su propio documento de cuenta y no pueda autoasignarse el estado `PRO` desde el cliente. Sin embargo, ningún sistema en internet o en dispositivos móviles es infalible al 100 %.
+
+Los datos locales permanecen hasta que los elimines o limpies el almacenamiento de la app. Los datos de cuenta en Firebase permanecen mientras tu cuenta esté activa o hasta que solicites su eliminación.
+
+## 6. Derechos del usuario y eliminación de cuenta
+
+Puedes revisar o modificar tus datos locales dentro de la Aplicación y cerrar sesión en cualquier momento desde **Ajustes**. Si deseas solicitar la eliminación de tu cuenta y datos asociados en Firebase, contáctanos a través de:
+
+- **Correo de contacto:** `[CORREO_DE_SOPORTE]`
+- **Responsable / Desarrollador:** `[Joel José Salazar Vargas C.I:30.022434]`
+
+## 7. Cambios en esta Política de Privacidad
+
+Podemos actualizar esta Política de Privacidad ocasionalmente para reflejar cambios en la Aplicación o en requisitos legales/de tienda. Publicaremos la versión vigente en `[URL_DE_POLITICA_DE_PRIVACIDAD]` indicando la fecha de actualización.
