@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#090d16" />
+  <meta name="description" content="RutaFlash Pro - Optimizador de rutas de delivery, lector IA de WhatsApp y control de caja para repartidores." />
+  <title>RutaFlash Pro | Delivery & Rutas</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- HEADER SUPERIOR -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <h1>RutaFlash <span id="planBadge" class="badge-free">GRATIS</span></h1>
+        <p id="headerSubtitle" class="subtitle">0 / 25 paradas activas</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="btnLang" class="icon-btn" title="Cambiar Idioma / Language">🌐 ES</button>
+      <button id="btnPro" class="pro-btn">👑 PRO</button>
+    </div>
+  </header>
+
+  <!-- RESUMEN FINANCIERO RÁPIDO (CAJA DEL REPARTIDOR) -->
+  <section class="finance-strip" id="financeStrip">
+    <div class="fin-card">
+      <span class="fin-label" data-i18n="cashHand">Efectivo en mano</span>
+      <strong id="statCash" class="fin-val text-green">$0.00</strong>
+    </div>
+    <div class="fin-card">
+      <span class="fin-label" data-i18n="digitalPaid">Digital / Transf.</span>
+      <strong id="statDigital" class="fin-val text-blue">$0.00</strong>
+    </div>
+    <div class="fin-card">
+      <span class="fin-label" data-i18n="myEarnings">Mi Ganancia</span>
+      <strong id="statEarnings" class="fin-val text-amber">$0.00</strong>
+    </div>
+  </section>
+
+  <!-- CONTENEDOR PRINCIPAL DE VISTAS -->
+  <main class="main-container">
+
+    <!-- VISTA 1: RUTA Y PARADAS -->
+    <section id="viewRoute" class="view active">
+      <!-- Barra de Herramientas Rápidas -->
+      <div class="quick-actions-grid">
+        <button class="action-card primary" id="btnOpenAdd">
+          <span class="ac-icon">➕</span>
+          <span class="ac-text" data-i18n="addStop">Agregar Parada</span>
+        </button>
+        <button class="action-card ai" id="btnOpenMagic">
+          <span class="ac-icon">🪄</span>
+          <span class="ac-text" data-i18n="pasteWhatsapp">Pegar WhatsApp</span>
+        </button>
+        <button class="action-card optimize" id="btnOptimizeRoute">
+          <span class="ac-icon">🧭</span>
+          <span class="ac-text" data-i18n="optimize">Ordenar Ruta</span>
+        </button>
+      </div>
+
+      <!-- Barra de Filtros y Progreso -->
+      <div class="route-toolbar">
+        <div class="filter-pills">
+          <button class="pill active" data-filter="all" data-i18n="all">Todas</button>
+          <button class="pill" data-filter="pending" data-i18n="pending">Pendientes</button>
+          <button class="pill" data-filter="delivered" data-i18n="delivered">Entregadas</button>
+        </div>
+        <button id="btnClearDelivered" class="text-danger-btn" data-i18n="clearDone">Limpiar hechas</button>
+      </div>
+
+      <!-- Lista de Paradas -->
+      <div id="stopsList" class="stops-list">
+        <!-- Renderizado dinámico por app.js -->
+      </div>
+    </section>
+
+    <!-- VISTA 2: CIERRE DE CAJA Y ESTADÍSTICAS -->
+    <section id="viewWallet" class="view">
+      <div class="card-box">
+        <div class="card-header-row">
+          <h2 data-i18n="dailyClosure">💰 Cierre de Caja del Día</h2>
+          <select id="currencySelector" class="select-compact"></select>
+        </div>
+        <p class="muted-text" data-i18n="closureDesc">Control exacto de dinero cobrado a clientes y tus ganancias netas por envíos.</p>
+
+        <div class="wallet-summary-grid">
+          <div class="w-box">
+            <span data-i18n="totalCollected">Total Cobrado Clientes</span>
+            <h3 id="wTotalCollected">$0.00</h3>
+          </div>
+          <div class="w-box">
+            <span data-i18n="pendingToCollect">Por Cobrar (En ruta)</span>
+            <h3 id="wPendingCollect" class="text-amber">$0.00</h3>
+          </div>
+          <div class="w-box">
+            <span data-i18n="cashToSettle">Efectivo a Entregar</span>
+            <h3 id="wCashToSettle" class="text-green">$0.00</h3>
+          </div>
+          <div class="w-box">
+            <span data-i18n="deliveryFees">Tus Ganancias (Envíos)</span>
+            <h3 id="wMyFees" class="text-blue">$0.00</h3>
+          </div>
+        </div>
+
+        <div class="wallet-actions">
+          <button id="btnExportReport" class="btn-secondary full-width">📤 Compartir Cierre por WhatsApp / Copiar</button>
+          <button id="btnResetDay" class="btn-outline-danger full-width">🔄 Iniciar Nueva Jornada (Borrar Todo)</button>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Viralidad / Referidos -->
+      <div class="card-box viral-box">
+        <h3>🚀 Comparte con otros Repartidores</h3>
+        <p class="muted-text">Ayuda a tus colegas a ahorrar tiempo en la calle y gana puntos para días PRO gratis.</p>
+        <button id="btnShareApp" class="btn-primary full-width">📲 Enviar App por WhatsApp</button>
+      </div>
+    </section>
+
+    <!-- VISTA 3: AJUSTES Y GPS -->
+    <section id="viewSettings" class="view">
+      <div class="card-box">
+        <h2 data-i18n="navPrefs">⚙️ Preferencias de Navegación</h2>
+        <div class="form-group">
+          <label data-i18n="defaultNav">Aplicación GPS preferida al tocar "Ir":</label>
+          <select id="navAppSelect" class="input-field">
+            <option value="google">Google Maps (Recomendado)</option>
+            <option value="waze">Waze (Tráfico y Policía en vivo)</option>
+            <option value="apple">Apple Maps (iOS)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tarifa de envío por defecto (Tu ganancia):</label>
+          <input type="number" id="defaultFeeInput" class="input-field" placeholder="Ej: 2.50" step="0.1" />
+        </div>
+
+        <div class="form-group">
+          <label>Plantilla de mensaje WhatsApp al cliente:</label>
+          <textarea id="waTemplateInput" class="input-field" rows="3"></textarea>
+          <small class="muted-text">Variables: {nombre}, {direccion}, {monto}</small>
+        </div>
+
+        <button id="btnSaveSettings" class="btn-primary full-width">💾 Guardar Configuración</button>
+      </div>
+
+      <div class="card-box">
+        <h3>📱 Instalar como App Nativa</h3>
+        <p class="muted-text">Funciona 100% sin internet una vez cargada. Puedes instalarla en tu pantalla de inicio.</p>
+        <button id="btnInstallPWA" class="btn-secondary full-width" style="display:none;">⬇️ Instalar RutaFlash en mi Teléfono</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ESPACIO RESERVADO PARA BANNER DE GOOGLE ADMOB (320x50 estándar) -->
+  <div id="admobBannerContainer" class="admob-banner-slot">
+    <div class="ad-placeholder" id="adBannerContent">
+      <span class="ad-tag">AD</span>
+      <span id="adBannerText">Espacio Google AdMob Banner (Configurar ID en config.js)</span>
+      <button id="btnRemoveAds" class="ad-remove-link">Quitar</button>
+    </div>
+  </div>
+
+  <!-- BARRA DE NAVEGACIÓN INFERIOR -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-target="viewRoute">
+      <span class="nav-icon">🗺️</span>
+      <span class="nav-label" data-i18n="tabRoute">Ruta</span>
+    </button>
+    <button class="nav-item" data-target="viewWallet">
+      <span class="nav-icon">💵</span>
+      <span class="nav-label" data-i18n="tabWallet">Caja</span>
+    </button>
+    <button class="nav-item" data-target="viewSettings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label" data-i18n="tabSettings">Ajustes</span>
+    </button>
+  </nav>
+
+  <!-- MODAL 1: AGREGAR / EDITAR PARADA -->
+  <div id="modalStop" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalStopTitle">➕ Nueva Parada</h3>
+        <button class="close-modal" data-close="modalStop">✕</button>
+      </div>
+      <form id="stopForm">
+        <input type="hidden" id="stopId" />
+        <div class="form-group">
+          <label>Dirección o Sector *</label>
+          <div class="input-with-btn">
+            <input type="text" id="stopAddress" class="input-field" placeholder="Ej: Av. Soublette, Edif. Caribe, Maiquetía" required />
+            <button type="button" id="btnUseCurrentGPS" class="btn-gps" title="Usar mi ubicación actual">📍</button>
+          </div>
+          <small id="geoStatus" class="muted-text"></small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cliente</label>
+            <input type="text" id="stopClient" class="input-field" placeholder="Nombre" />
+          </div>
+          <div class="form-group">
+            <label>Teléfono (WhatsApp)</label>
+            <input type="tel" id="stopPhone" class="input-field" placeholder="Ej: +584141234567" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cobrar al Cliente</label>
+            <input type="number" id="stopAmount" class="input-field" placeholder="0.00" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>Método de Pago</label>
+            <select id="stopPaymentMethod" class="input-field">
+              <option value="cash">💵 Efectivo</option>
+              <option value="digital">📲 Transferencia / Pago Móvil</option>
+              <option value="paid">✅ Ya está pagado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Mi Ganancia (Delivery)</label>
+            <input type="number" id="stopFee" class="input-field" placeholder="0.00" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>Prioridad</label>
+            <select id="stopPriority" class="input-field">
+              <option value="normal">Normal</option>
+              <option value="urgent">🔥 Urgente (Ir primero)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Punto de referencia / Notas</label>
+          <input type="text" id="stopNotes" class="input-field" placeholder="Ej: Portón azul, tocar timbre 2, vuelto de $20" />
+        </div>
+
+        <button type="submit" class="btn-primary full-width">Guardar Parada en Ruta</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: LECTOR MÁGICO DE WHATSAPP (IA LOCAL) -->
+  <div id="modalMagic" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>🪄 Lector Inteligente de WhatsApp</h3>
+        <button class="close-modal" data-close="modalMagic">✕</button>
+      </div>
+      <p class="muted-text">Pega aquí uno o varios pedidos copiados directo del chat de WhatsApp. La app extraerá cliente, teléfono, dirección, monto y notas automáticamente.</p>
+      <textarea id="magicTextInput" class="input-field" rows="6" placeholder="Ejemplo:
+Cliente: María Pérez
+Tel: 0414-5558899
+Dirección: Urb. Caribe, Calle 3, Quinta Rosa
+Cobrar: $18 en efectivo
+Nota: Llamar al llegar al portón"></textarea>
+      <div class="modal-actions-row">
+        <button type="button" id="btnPasteClipboard" class="btn-secondary">📋 Pegar del Portapapeles</button>
+        <button type="button" id="btnProcessMagic" class="btn-primary">⚡ Extraer y Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: COMPROBANTE DE ENTREGA (POD) -->
+  <div id="modalPOD" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>✅ Confirmar Entrega</h3>
+        <button class="close-modal" data-close="modalPOD">✕</button>
+      </div>
+      <input type="hidden" id="podStopId" />
+      <p id="podSummary" class="pod-summary"></p>
+
+      <div class="form-group">
+        <label>Confirmar método de pago recibido:</label>
+        <select id="podFinalPayment" class="input-field">
+          <option value="cash">💵 Recibí Efectivo</option>
+          <option value="digital">📲 Recibí Transferencia / Pago Móvil</option>
+          <option value="paid">✅ Ya estaba pagado</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Foto de respaldo (Opcional):</label>
+        <input type="file" id="podPhotoInput" accept="image/*" capture="environment" class="input-field" />
+        <img id="podPhotoPreview" class="pod-preview" style="display:none;" alt="Comprobante" />
+      </div>
+
+      <div class="form-group">
+        <label>Nota de cierre (Ej: Recibido por vigilancia):</label>
+        <input type="text" id="podNoteInput" class="input-field" placeholder="Entregado sin novedad" />
+      </div>
+
+      <button type="button" id="btnConfirmPOD" class="btn-success full-width">🎉 Marcar como Entregado</button>
+    </div>
+  </div>
+
+  <!-- MODAL 4: PLAN PRO Y ANUNCIO BONIFICADO -->
+  <div id="modalPro" class="modal">
+    <div class="modal-content pro-modal">
+      <div class="modal-header">
+        <h3>👑 RutaFlash PRO</h3>
+        <button class="close-modal" data-close="modalPro">✕</button>
+      </div>
+      <div class="pro-hero">
+        <p class="pro-price"><span id="proPriceDisplay">$3.99</span> <small>/ mes</small></p>
+        <p class="muted-text">75% más económico que Circuit y Spoke</p>
+      </div>
+      <ul class="pro-features">
+        <li>✅ <strong>Paradas Ilimitadas</strong> por ruta</li>
+        <li>✅ <strong>Cero Publicidad</strong> (AdMob desactivado)</li>
+        <li>✅ <strong>Lector masivo</strong> de múltiples chats a la vez</li>
+        <li>✅ <strong>Comprobantes fotográficos</strong> ilimitados</li>
+      </ul>
+
+      <div class="reward-box">
+        <h4>🎁 ¿No quieres pagar hoy?</h4>
+        <p class="muted-text">Mira un video corto patrocinado y desbloquea <strong>+15 paradas extra</strong> para tu ruta de hoy.</p>
+        <button type="button" id="btnWatchRewardedAd" class="btn-amber full-width">🎬 Ver Video (+15 Paradas Gratis)</button>
+      </div>
+
+      <div class="activation-box">
+        <label>¿Ya tienes código de activación PRO?</label>
+        <div class="input-with-btn">
+          <input type="text" id="proCodeInput" class="input-field" placeholder="Ingresa código (Ej: PRO2026)" />
+          <button type="button" id="btnActivatePro" class="btn-primary">Activar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST DE NOTIFICACIONES -->
+  <div id="toast" class="toast"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
