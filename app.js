@@ -1,5 +1,5 @@
 // ==========================================
-// RUTA FLASH v3.2 - LIMITE GRATIS 15 + ONBOARDING COMPLETO + MONETIZACION
+// RUTA FLASH v3.3 - LIMITE GRATIS 15 + ONBOARDING COMPLETO + MONETIZACION
 // ==========================================
 
 const FREE_LIMIT = 15;
@@ -56,6 +56,25 @@ function saveState() {
   updateUI();
 }
 
+async function syncUserProfileToFirestore(user, isProValue = null) {
+  try {
+    if (!fbDb || !user || !user.uid) return;
+    const payload = {
+      email: user.email || state.email || '',
+      emailVerified: Boolean(user.emailVerified),
+      updatedAt: new Date().toISOString()
+    };
+    if (typeof isProValue === 'boolean') {
+      payload.isPro = isProValue;
+    } else if (typeof state.isPro === 'boolean') {
+      payload.isPro = state.isPro;
+    }
+    await fbDb.collection('users').doc(user.uid).set(payload, { merge: true });
+  } catch (e) {
+    console.warn('No se pudo sincronizar perfil en Firestore:', e);
+  }
+}
+
 function initFirebaseIfConfigured() {
   try {
     if (typeof firebase === 'undefined' || typeof FIREBASE_CONFIG === 'undefined') return;
@@ -72,7 +91,9 @@ function initFirebaseIfConfigured() {
       const logoutBtn = document.getElementById('btn-auth-logout');
       if (user) {
         state.email = user.email || state.email;
-        if (statusEl) statusEl.textContent = 'Sesión activa: ' + (user.email || user.uid);
+        if (statusEl) {
+          statusEl.textContent = 'Sesión activa: ' + (user.email || user.uid) + (user.emailVerified ? ' (Verificado)' : ' (Sin verificar)');
+        }
         if (logoutBtn) logoutBtn.style.display = 'inline-block';
       } else {
         if (statusEl) statusEl.textContent = 'Estado de sesión: No iniciada';
@@ -217,6 +238,8 @@ function setAuthMode(mode) {
   const regBtn = document.getElementById('btn-mode-register');
   const logBtn = document.getElementById('btn-mode-login');
   const submitBtn = document.getElementById('btn-onb-email-submit');
+  const feedback = document.getElementById('onb-auth-feedback');
+  if (feedback) feedback.textContent = '';
   if (mode === 'login') {
     if (regBtn) regBtn.classList.remove('active');
     if (logBtn) logBtn.classList.add('active');
@@ -235,45 +258,58 @@ async function handleOnboardingEmailAuth() {
   const feedback = document.getElementById('onb-auth-feedback');
 
   if (!email || !email.includes('@')) {
-    if (feedback) feedback.textContent = 'Ingresa un correo electrónico válido.';
+    if (feedback) feedback.textContent = '❌ Ingresa un correo electrónico válido.';
     return;
   }
   if (password.length < 6) {
-    if (feedback) feedback.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    if (feedback) feedback.textContent = '❌ La contraseña debe tener al menos 6 caracteres.';
     return;
   }
 
   if (!fbAuth) {
-    if (feedback) feedback.textContent = 'Firebase Auth no está inicializado. Revisa la configuración de Firebase o continúa sin cuenta en línea.';
+    if (feedback) feedback.textContent = '❌ No se pudo conectar con Firebase Auth. Revisa tu conexión o la configuración.';
     return;
   }
 
   try {
     if (authMode === 'login') {
-      await fbAuth.signInWithEmailAndPassword(email, password);
+      const cred = await fbAuth.signInWithEmailAndPassword(email, password);
+      const user = cred.user;
+      if (user && !user.emailVerified) {
+        if (feedback) {
+          feedback.textContent = '❌ Tu correo aún no está verificado. Revisa tu bandeja de entrada o spam y haz clic en el enlace de verificación.';
+        }
+        return;
+      }
       state.email = email;
       saveState();
-      if (feedback) feedback.textContent = '✅ Sesión iniciada correctamente.';
+      await syncUserProfileToFirestore(user);
+      if (feedback) feedback.textContent = '✅ Sesión iniciada y correo verificado.';
       setOnboardingStep(3);
     } else {
       const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
+      const user = cred.user;
+      if (user && typeof user.sendEmailVerification === 'function') {
+        await user.sendEmailVerification();
+      }
       state.email = email;
       saveState();
-      if (cred.user && typeof cred.user.sendEmailVerification === 'function') {
-        await cred.user.sendEmailVerification().catch(() => {});
+      await syncUserProfileToFirestore(user);
+      if (feedback) {
+        feedback.textContent = '📧 Te enviamos un correo de verificación a ' + email + '. Ábrelo (revisa también Spam), verifica tu cuenta y luego selecciona "Ya tengo cuenta" para iniciar sesión.';
       }
-      if (feedback) feedback.textContent = '✅ Cuenta creada. Revisa tu correo (y spam) para verificar tu dirección.';
-      setOnboardingStep(3);
     }
   } catch (err) {
     const code = (err && err.code) ? err.code : '';
     let friendly = (err && err.message) ? err.message : 'No se pudo completar la autenticación.';
-    if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
-      friendly = 'Correo o contraseña incorrectos, o la cuenta no existe.';
+    if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+      friendly = 'No existe una cuenta con ese correo y clave o los datos son incorrectos. Si es tu primera vez, selecciona "Crear cuenta".';
     } else if (code === 'auth/email-already-in-use') {
       friendly = 'Ese correo ya está registrado. Cambia a "Ya tengo cuenta" e inicia sesión.';
     } else if (code === 'auth/operation-not-allowed') {
       friendly = 'Activa "Correo electrónico/contraseña" en Firebase Console > Authentication > Sign-in method.';
+    } else if (code === 'auth/network-request-failed') {
+      friendly = 'Sin conexión a internet para validar tu cuenta en Firebase.';
     }
     if (feedback) feedback.textContent = '❌ ' + friendly;
   }
@@ -281,22 +317,34 @@ async function handleOnboardingEmailAuth() {
 
 async function handleOnboardingGoogleAuth() {
   const feedback = document.getElementById('onb-auth-feedback');
-  if (fbAuth && typeof firebase !== 'undefined' && firebase.auth && firebase.auth.GoogleAuthProvider) {
-    try {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      const res = await fbAuth.signInWithPopup(provider);
-      if (res && res.user && res.user.email) {
-        state.email = res.user.email;
-        saveState();
-      }
-      if (feedback) feedback.textContent = '✅ Vinculado con Google.';
-      setOnboardingStep(3);
-      return;
-    } catch (err) {
-      if (feedback) feedback.textContent = 'Google Auth: ' + (err && err.message ? err.message : 'Continúa con correo o pasa al siguiente paso.');
-    }
+  if (!fbAuth || typeof firebase === 'undefined' || !firebase.auth || !firebase.auth.GoogleAuthProvider) {
+    if (feedback) feedback.textContent = '❌ Google Auth no está disponible en este entorno.';
+    return;
   }
-  setOnboardingStep(3);
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const res = await fbAuth.signInWithPopup(provider);
+    if (!res || !res.user) {
+      if (feedback) feedback.textContent = '❌ No se completó el inicio con Google.';
+      return;
+    }
+    if (res.user.email) {
+      state.email = res.user.email;
+      saveState();
+    }
+    await syncUserProfileToFirestore(res.user);
+    if (feedback) feedback.textContent = '✅ Vinculado con Google.';
+    setOnboardingStep(3);
+  } catch (err) {
+    const code = (err && err.code) ? err.code : '';
+    let msg = (err && err.message) ? err.message : 'No se pudo iniciar con Google.';
+    if (code === 'auth/unauthorized-domain') {
+      msg = 'Agrega tu dominio en Firebase Console > Authentication > Settings > Authorized domains.';
+    } else if (code === 'auth/popup-closed-by-user') {
+      msg = 'Cancelaste la ventana de Google.';
+    }
+    if (feedback) feedback.textContent = '❌ Google Auth: ' + msg;
+  }
 }
 
 // ==========================================
@@ -1115,6 +1163,9 @@ window.applyVerifiedProStatus = async function(isVerifiedPaid) {
   if (!isVerifiedPaid) return;
   state.isPro = true;
   saveState();
+  if (currentFbUser) {
+    await syncUserProfileToFirestore(currentFbUser, true);
+  }
 };
 
 window.openProModal = function() {
@@ -1236,10 +1287,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     try {
-      await fbAuth.createUserWithEmailAndPassword(email, pass);
+      const cred = await fbAuth.createUserWithEmailAndPassword(email, pass);
+      if (cred.user && typeof cred.user.sendEmailVerification === 'function') {
+        await cred.user.sendEmailVerification();
+      }
       state.email = email;
       saveState();
-      showAppToast('✅ Cuenta creada', 'success');
+      await syncUserProfileToFirestore(cred.user);
+      showAppToast('📧 Cuenta creada. Te enviamos un correo para verificar tu cuenta.', 'success');
     } catch (e) {
       showAppToast('Error: ' + (e && e.message ? e.message : 'No se pudo crear la cuenta'), 'error');
     }
@@ -1257,9 +1312,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     try {
-      await fbAuth.signInWithEmailAndPassword(email, pass);
+      const cred = await fbAuth.signInWithEmailAndPassword(email, pass);
+      if (cred.user && !cred.user.emailVerified) {
+        showAppToast('Revisa tu correo para verificar tu cuenta antes de continuar.', 'warn');
+        return;
+      }
       state.email = email;
       saveState();
+      await syncUserProfileToFirestore(cred.user);
       showAppToast('✅ Sesión iniciada', 'success');
     } catch (e) {
       showAppToast('Error: ' + (e && e.message ? e.message : 'No se pudo iniciar sesión'), 'error');
